@@ -1,0 +1,16 @@
+{
+  "printer_model": "ZT230",
+  "dpi": 203,
+  "max_width": 4.0,
+  "max_height": 3.0,
+  "print_speed": 4,
+  "darkness": 15,
+  "simulation_delay": 2.5,
+  "enable_status_response": true,
+  "auto_print": true,
+  "label_templates": {
+    "default_template": "standard",
+    "enable_barcode": true,
+    "barcode_type": "CODE128"
+  }
+}

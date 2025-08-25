@@ -1,0 +1,109 @@
+[
+  {
+    "id": "mettler_zebra_flow",
+    "label": "Mettler Toledo to Zebra Converter",
+    "nodes": [
+      {
+        "id": "serial_in",
+        "type": "serial in",
+        "name": "Mettler Serial Input",
+        "serial": "com_port_config",
+        "x": 160,
+        "y": 140,
+        "z": "flow1",
+        "wires": [["parse_mettler"]]
+      },
+      {
+        "id": "parse_mettler", 
+        "type": "function",
+        "name": "Parse Mettler Data",
+        "func": "// Parsear mensaje Mettler Toledo\n// Formato: STX + WT,peso,unidad,estado,target,producto,timestamp + ETX + checksum\n\nvar input = msg.payload.toString();\n\n// Buscar STX (0x02) y ETX (0x03)\nvar startIdx = input.indexOf('\\x02');\nvar endIdx = input.indexOf('\\x03');\n\nif (startIdx >= 0 && endIdx > startIdx) {\n    var data = input.substring(startIdx + 1, endIdx);\n    var parts = data.split(',');\n    \n    if (parts.length >= 7 && parts[0] === 'WT') {\n        msg.mettler_data = {\n            weight: parseFloat(parts[1]),\n            unit: parts[2],\n            status: parts[3], // S=Stable, U=Unstable, O=Over, T=Under\n            target: parts[4],\n            product: parts[5],\n            timestamp: parts[6]\n        };\n        \n        // Log para debugging\n        node.log(`Peso: ${msg.mettler_data.weight}${msg.mettler_data.unit} - Producto: ${msg.mettler_data.product}`);\n        \n        return msg;\n    }\n}\n\n// Si no se puede parsear, no enviar mensaje\nreturn null;",
+        "outputs": 1,
+        "x": 370,
+        "y": 140,
+        "z": "flow1", 
+        "wires": [["generate_zpl"]]
+      },
+      {
+        "id": "generate_zpl",
+        "type": "function", 
+        "name": "Generate ZPL Label",
+        "func": "// Generar etiqueta ZPL desde datos Mettler\n\nvar data = msg.mettler_data;\nif (!data) return null;\n\n// Template ZPL estándar\nvar zpl = `^XA\n^LH0,0\n^FO50,50^A0N,50,50^FDPeso:^FS\n^FO200,50^A0N,60,60^FD${data.weight} ${data.unit}^FS\n^FO50,120^A0N,30,30^FDProducto: ${data.product}^FS\n^FO50,160^A0N,25,25^FDFecha: ${data.timestamp.split('T')[0]}^FS\n^FO50,190^A0N,25,25^FDHora: ${data.timestamp.split('T')[1]}^FS\n`;\n\n// Agregar estado visual\nswitch(data.status) {\n    case 'S': // Stable - OK\n        zpl += '^FO300,120^A0N,40,40^FDOK^FS\\n';\n        break;\n    case 'U': // Under weight\n        zpl += '^FO300,120^A0N,30,30^FDBAJO^FS\\n';\n        break;\n    case 'O': // Over weight  \n        zpl += '^FO300,120^A0N,30,30^FDEXCESO^FS\\n';\n        break;\n    case 'T': // Target\n        zpl += '^FO300,120^A0N,30,30^FDTARGET^FS\\n';\n        break;\n}\n\n// Código de barras del producto\nzpl += `^FO50,220^BY2,3,50^BCN,50,Y,N,N^FD${data.product}^FS\\n`;\n\n// Finalizar etiqueta\nzpl += '^XZ';\n\nmsg.payload = zpl;\nmsg.topic = 'zebra_print';\n\nnode.log(`ZPL generado para ${data.product}`);\n\nreturn msg;",
+        "outputs": 1,
+        "x": 580,
+        "y": 140,
+        "z": "flow1",
+        "wires": [["tcp_out", "debug_zpl"]]
+      },
+      {
+        "id": "tcp_out",
+        "type": "tcp out",
+        "name": "Zebra Printer TCP",
+        "host": "192.168.1.100",
+        "port": "9100",
+        "beserver": "client",
+        "base64": false,
+        "end": false,
+        "x": 790,
+        "y": 100,
+        "z": "flow1",
+        "wires": []
+      },
+      {
+        "id": "debug_zpl",
+        "type": "debug",
+        "name": "ZPL Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 790,
+        "y": 180,
+        "z": "flow1",
+        "wires": []
+      },
+      {
+        "id": "inject_test",
+        "type": "inject",
+        "name": "Test Data",
+        "props": [
+          {
+            "p": "payload"
+          }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "\\x02WT,01250.5,g,S,T,PROD001,2024-08-25T10:30:15\\x0341\\r\\n",
+        "payloadType": "str",
+        "x": 160,
+        "y": 220,
+        "z": "flow1",
+        "wires": [["parse_mettler"]]
+      },
+      {
+        "id": "com_port_config",
+        "type": "serial-port",
+        "serialport": "COM3",
+        "serialbaud": "9600",
+        "databits": "8",
+        "parity": "none", 
+        "stopbits": "1",
+        "waitfor": "",
+        "dtr": "none",
+        "rts": "none",
+        "cts": "none",
+        "dsr": "none",
+        "newline": "\\n",
+        "bin": "false",
+        "out": "char",
+        "addchar": "",
+        "responsetimeout": "10000"
+      }
+    ]
+  }
+]

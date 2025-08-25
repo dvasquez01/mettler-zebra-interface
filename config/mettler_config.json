@@ -1,0 +1,16 @@
+{
+  "min_weight": 0.0,
+  "max_weight": 5000.0,
+  "weight_interval": 3.0,
+  "tolerance": 50.0,
+  "target_weight": 1000.0,
+  "product_codes": [
+    "PROD001",
+    "PROD002", 
+    "PROD003",
+    "CEREALES_A",
+    "CEREALES_B"
+  ],
+  "line_number": "LINE01",
+  "operator": "OPERADOR01"
+}
